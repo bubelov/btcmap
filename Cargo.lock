@@ -118,6 +118,7 @@ dependencies = [
  "reqwest",
  "rocket",
  "rusqlite",
+ "serde",
  "serde_json",
  "uuid",
 ]
@@ -1000,6 +1001,7 @@ dependencies = [
  "rocket_codegen",
  "rocket_http",
  "serde",
+ "serde_json",
  "state",
  "tempfile",
  "time",

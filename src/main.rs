@@ -2,14 +2,12 @@ extern crate core;
 
 mod db;
 mod osm;
+mod model;
+mod repository;
+mod controller;
 
 use std::env;
-use rocket::{get, routes};
-
-#[get("/")]
-fn index() -> &'static str {
-    "Hello, world!"
-}
+use rocket::routes;
 
 #[rocket::main]
 async fn main() {
@@ -21,7 +19,7 @@ async fn cli_main(args: &[String]) {
     match args.len() {
         0 => {
             let server: Result<(), rocket::Error> = rocket::build()
-                .mount("/", routes![index])
+                .mount("/", routes![controller::place::index])
                 .launch()
                 .await;
 
