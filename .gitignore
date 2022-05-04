@@ -1,1 +1,5 @@
 btcmap.db
+osm-response.json
+osm-places.json
+
+/target
