@@ -1,4 +1,7 @@
+extern crate core;
+
 mod db;
+mod osm;
 
 use std::env;
 use rocket::{get, routes};
@@ -28,6 +31,9 @@ async fn cli_main(args: &[String]) {
         }
         _ => match args.first().unwrap().as_str() {
             "db" => db::cli_main(&args[1..]).await.unwrap_or_else(|e| {
+                panic!("{e}");
+            }),
+            "osm" => osm::cli_main(&args[1..]).await.unwrap_or_else(|e| {
                 panic!("{e}");
             }),
             _ => {

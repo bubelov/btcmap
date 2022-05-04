@@ -1,7 +1,3 @@
-btcmap.db
-osm-response.json
-osm-places.json
-
 /target
-
+btcmap.db
 .idea
