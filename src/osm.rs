@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use reqwest::Response;
 use rusqlite::{Connection, params};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use uuid::Uuid;
 
 pub async fn cli_main(args: &[String]) -> Result<()> {
@@ -61,6 +61,7 @@ async fn sync() -> Result<()> {
 
     for place in elements {
         let id = place["id"].as_i64().unwrap();
+        let source: String = format!("osm,id={}", id);
 
         let osm_type = place["type"].as_str().unwrap();
 
@@ -74,7 +75,10 @@ async fn sync() -> Result<()> {
             _ => place["center"].as_object().unwrap()["lon"].as_f64().unwrap(),
         };
 
-        let source: String = format!("osm,id={}", id);
+        let empty_map: Map<String, Value> = Map::new();
+        let tags: &Map<String, Value> = place["tags"].as_object().unwrap_or(&empty_map);
+        let empty_str: Value = Value::String(String::new());
+        let name: &str = tags.get("name").unwrap_or(&empty_str).as_str().unwrap();
 
         let exists: bool = tx.query_row("SELECT count(*) FROM places WHERE source = ?", [source.clone()], |row| {
             row.get(0)
@@ -86,8 +90,8 @@ async fn sync() -> Result<()> {
             println!("Place does not exist, inserting");
 
             tx.execute(
-                "INSERT INTO places (id, source, lat, lon) VALUES (?, ?, ?, ?)",
-                params![Uuid::new_v4().to_string(), source.clone(), lat, lon],
+                "INSERT INTO places (id, source, lat, lon, name) VALUES (?, ?, ?, ?, ?)",
+                params![Uuid::new_v4().to_string(), source.clone(), lat, lon, name],
             )?;
         }
     }

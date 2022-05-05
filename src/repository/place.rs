@@ -11,11 +11,11 @@ impl PlaceRepository {
     }
 
     pub fn select_all(&self) -> anyhow::Result<Vec<Place>> {
-        let mut stmt = self.conn.prepare("SELECT id, source, lat, lon FROM places")?;
+        let mut stmt = self.conn.prepare("SELECT id, source, lat, lon, name FROM places")?;
 
         let rows = stmt.query_map(
             [],
-            |row| Ok(Place { id: row.get(0)?, source: row.get(1)?, lat: row.get(2)?, lon: row.get(3)? }),
+            |row| Ok(Place { id: row.get(0)?, source: row.get(1)?, lat: row.get(2)?, lon: row.get(3)?, name: row.get(4)? }),
         )?;
 
         let mut places: Vec<Place> = Vec::new();
