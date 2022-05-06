@@ -79,6 +79,18 @@ async fn sync() -> Result<()> {
         let tags: &Map<String, Value> = place["tags"].as_object().unwrap_or(&empty_map);
         let empty_str: Value = Value::String(String::new());
         let name: &str = tags.get("name").unwrap_or(&empty_str).as_str().unwrap();
+        let addr_housenumber: &str = tags.get("addr:housenumber").unwrap_or(&empty_str).as_str().unwrap();
+        let addr_street: &str = tags.get("addr:street").unwrap_or(&empty_str).as_str().unwrap();
+        let mut addr = String::new();
+        if addr_housenumber.len() > 0 && addr_street.len() > 0 {
+            addr.push_str(addr_housenumber);
+            addr.push_str(" ");
+            addr.push_str(addr_street);
+        }
+        let amenity: &str = tags.get("amenity").unwrap_or(&empty_str).as_str().unwrap();
+        let phone: &str = tags.get("phone").unwrap_or(&empty_str).as_str().unwrap();
+        let website: &str = tags.get("website").unwrap_or(&empty_str).as_str().unwrap();
+        let opening_hours: &str = tags.get("opening_hours").unwrap_or(&empty_str).as_str().unwrap();
 
         let exists: bool = tx.query_row("SELECT count(*) FROM places WHERE source = ?", [source.clone()], |row| {
             row.get(0)
@@ -90,8 +102,8 @@ async fn sync() -> Result<()> {
             println!("Place does not exist, inserting");
 
             tx.execute(
-                "INSERT INTO places (id, source, lat, lon, name) VALUES (?, ?, ?, ?, ?)",
-                params![Uuid::new_v4().to_string(), source.clone(), lat, lon, name],
+                "INSERT INTO places (id, name, lat, lon, address, amenity, phone, website, opening_hours, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                params![Uuid::new_v4().to_string(), name.clone(), lat, lon, addr.clone(), amenity.clone(), phone.clone(), website.clone(), opening_hours.clone(), source.clone()],
             )?;
         }
     }
