@@ -1,4 +1,6 @@
 use rusqlite::Connection;
+use serde_json::Value;
+use anyhow::Result;
 use crate::model::Place;
 
 pub struct PlaceRepository {
@@ -10,25 +12,24 @@ impl PlaceRepository {
         PlaceRepository { conn }
     }
 
-    pub fn select_all(&self) -> anyhow::Result<Vec<Place>> {
-        let mut stmt = self.conn.prepare("SELECT id, name, lat, lon, address, amenity, phone, website, opening_hours, source, created_at, updated_at FROM places")?;
+    pub fn select_all(&self) -> Result<Vec<Place>> {
+        let mut stmt = self.conn.prepare("SELECT id, lat, lon, tags, created_at, updated_at FROM places ORDER BY id DESC")?;
 
         let rows = stmt.query_map(
             [],
-            |row| Ok(Place {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                lat: row.get(2)?,
-                lon: row.get(3)?,
-                address: row.get(4)?,
-                amenity: row.get(5)?,
-                phone: row.get(6)?,
-                website: row.get(7)?,
-                opening_hours: row.get(8)?,
-                source: row.get(9)?,
-                created_at: row.get(10)?,
-                updated_at: row.get(11)?,
-            }),
+            |row| {
+                let tags: String = row.get(3)?;
+                let tags: Value = serde_json::from_str(&tags).unwrap_or_default();
+
+                Ok(Place {
+                    id: row.get(0)?,
+                    lat: row.get(1)?,
+                    lon: row.get(2)?,
+                    tags,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            },
         )?;
 
         let mut places: Vec<Place> = Vec::new();

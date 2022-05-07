@@ -5,7 +5,6 @@ use anyhow::{Context, Result};
 use reqwest::Response;
 use rusqlite::{Connection, params};
 use serde_json::{Map, Value};
-use uuid::Uuid;
 
 pub async fn cli_main(args: &[String]) -> Result<()> {
     match args.first() {
@@ -37,8 +36,6 @@ async fn sync() -> Result<()> {
                 [out:json][timeout:300];
                 (
                   node["payment:bitcoin"="yes"];
-                  way["payment:bitcoin"="yes"];
-                  relation["payment:bitcoin"="yes"];
                 );
                 out center;
             "#)
@@ -61,38 +58,12 @@ async fn sync() -> Result<()> {
 
     for place in elements {
         let id = place["id"].as_i64().unwrap();
-        let source: String = format!("osm,id={}", id);
-
-        let osm_type = place["type"].as_str().unwrap();
-
-        let lat: f64 = match osm_type {
-            "node" => place["lat"].as_f64().unwrap(),
-            _ => place["center"].as_object().unwrap()["lat"].as_f64().unwrap(),
-        };
-
-        let lon: f64 = match osm_type {
-            "node" => place["lon"].as_f64().unwrap(),
-            _ => place["center"].as_object().unwrap()["lon"].as_f64().unwrap(),
-        };
-
+        let lat: f64 = place["lat"].as_f64().unwrap();
+        let lon: f64 = place["lon"].as_f64().unwrap();
         let empty_map: Map<String, Value> = Map::new();
         let tags: &Map<String, Value> = place["tags"].as_object().unwrap_or(&empty_map);
-        let empty_str: Value = Value::String(String::new());
-        let name: &str = tags.get("name").unwrap_or(&empty_str).as_str().unwrap();
-        let addr_housenumber: &str = tags.get("addr:housenumber").unwrap_or(&empty_str).as_str().unwrap();
-        let addr_street: &str = tags.get("addr:street").unwrap_or(&empty_str).as_str().unwrap();
-        let mut addr = String::new();
-        if addr_housenumber.len() > 0 && addr_street.len() > 0 {
-            addr.push_str(addr_housenumber);
-            addr.push_str(" ");
-            addr.push_str(addr_street);
-        }
-        let amenity: &str = tags.get("amenity").unwrap_or(&empty_str).as_str().unwrap();
-        let phone: &str = tags.get("phone").unwrap_or(&empty_str).as_str().unwrap();
-        let website: &str = tags.get("website").unwrap_or(&empty_str).as_str().unwrap();
-        let opening_hours: &str = tags.get("opening_hours").unwrap_or(&empty_str).as_str().unwrap();
 
-        let exists: bool = tx.query_row("SELECT count(*) FROM places WHERE source = ?", [source.clone()], |row| {
+        let exists: bool = tx.query_row("SELECT count(*) FROM places WHERE id = ?", [id.clone()], |row| {
             row.get(0)
         })?;
 
@@ -102,8 +73,8 @@ async fn sync() -> Result<()> {
             println!("Place does not exist, inserting");
 
             tx.execute(
-                "INSERT INTO places (id, name, lat, lon, address, amenity, phone, website, opening_hours, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                params![Uuid::new_v4().to_string(), name.clone(), lat, lon, addr.clone(), amenity.clone(), phone.clone(), website.clone(), opening_hours.clone(), source.clone()],
+                "INSERT INTO places (id, lat, lon, tags) VALUES (?, ?, ?, ?)",
+                params![id.clone(), lat, lon, serde_json::to_string(tags)?],
             )?;
         }
     }
