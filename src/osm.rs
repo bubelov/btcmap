@@ -1,12 +1,13 @@
 use std::fs::{File, Metadata};
 use std::io::Write;
 use std::path::Path;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use reqwest::Response;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, Transaction};
 use serde_json::{Map, Value};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use crate::model::Place;
 use crate::repository::PlaceRepository;
 
 pub async fn cli_main(args: &[String]) -> Result<()> {
@@ -14,7 +15,7 @@ pub async fn cli_main(args: &[String]) -> Result<()> {
         None => println!("No options passed"),
         Some(first_arg) => {
             match first_arg.as_str() {
-                "sync" => sync().await.context("Failed to sync with OSM")?,
+                "sync" => sync().await?,
                 _ => println!("Unknown command {first_arg}"),
             }
         }
@@ -60,8 +61,17 @@ async fn sync() -> Result<()> {
     println!("Got {} elements", elements.len());
 
     let repo: PlaceRepository = PlaceRepository::new(Connection::open("btcmap.db")?);
+    let ids: Vec<i64> = elements.iter().map(|it| it["id"].as_i64().unwrap()).collect();
+    let cached_places: Vec<Place> = repo.select_all()?;
+
+    for cached_place in &cached_places {
+        if !ids.contains(&cached_place.id) {
+            println!("Place with id {} was deleted from OSM", cached_place.id);
+        }
+    }
+
     let mut conn = Connection::open("btcmap.db")?;
-    let tx = conn.transaction()?;
+    let tx: Transaction = conn.transaction()?;
 
     for place in elements {
         let id = place["id"].as_i64().unwrap();
@@ -70,7 +80,7 @@ async fn sync() -> Result<()> {
         let empty_map: Map<String, Value> = Map::new();
         let tags: &Map<String, Value> = place["tags"].as_object().unwrap_or(&empty_map);
 
-        let cached_place = repo.select_by_id(id.to_string())?;
+        let cached_place = cached_places.iter().find(|it| it.id == id);
 
         match cached_place {
             Some(cached_place) => {
@@ -81,14 +91,20 @@ async fn sync() -> Result<()> {
                     println!("Change detected");
                     println!("Cached tags:\n{}", cached_tags);
                     println!("New tags:\n{}", new_tags);
+
+                    tx.execute(
+                        "UPDATE places SET tags = ? WHERE id = ?",
+                        params![new_tags, id],
+                    )?;
                 }
             }
             None => {
                 println!("Place does not exist, inserting");
+                println!("id: {}, lat: {}, lon {}", id, lat, lon);
 
                 tx.execute(
                     "INSERT INTO places (id, lat, lon, tags) VALUES (?, ?, ?, ?)",
-                    params![id.clone(), lat, lon, serde_json::to_string(tags)?],
+                    params![id, lat, lon, serde_json::to_string(tags)?],
                 )?;
             }
         }
