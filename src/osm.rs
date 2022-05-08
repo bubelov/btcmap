@@ -7,6 +7,7 @@ use rusqlite::{Connection, params};
 use serde_json::{Map, Value};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use crate::repository::PlaceRepository;
 
 pub async fn cli_main(args: &[String]) -> Result<()> {
     match args.first() {
@@ -58,6 +59,7 @@ async fn sync() -> Result<()> {
     let elements: &Vec<Value> = json["elements"].as_array().unwrap();
     println!("Got {} elements", elements.len());
 
+    let repo: PlaceRepository = PlaceRepository::new(Connection::open("btcmap.db")?);
     let mut conn = Connection::open("btcmap.db")?;
     let tx = conn.transaction()?;
 
@@ -68,19 +70,27 @@ async fn sync() -> Result<()> {
         let empty_map: Map<String, Value> = Map::new();
         let tags: &Map<String, Value> = place["tags"].as_object().unwrap_or(&empty_map);
 
-        let exists: bool = tx.query_row("SELECT count(*) FROM places WHERE id = ?", [id.clone()], |row| {
-            row.get(0)
-        })?;
+        let cached_place = repo.select_by_id(id.to_string())?;
 
-        if exists {
-            //println!("Place exists");
-        } else {
-            println!("Place does not exist, inserting");
+        match cached_place {
+            Some(cached_place) => {
+                let cached_tags: String = serde_json::to_string(&cached_place.tags)?;
+                let new_tags = serde_json::to_string(tags)?;
 
-            tx.execute(
-                "INSERT INTO places (id, lat, lon, tags) VALUES (?, ?, ?, ?)",
-                params![id.clone(), lat, lon, serde_json::to_string(tags)?],
-            )?;
+                if cached_tags != new_tags {
+                    println!("Change detected");
+                    println!("Cached tags:\n{}", cached_tags);
+                    println!("New tags:\n{}", new_tags);
+                }
+            }
+            None => {
+                println!("Place does not exist, inserting");
+
+                tx.execute(
+                    "INSERT INTO places (id, lat, lon, tags) VALUES (?, ?, ?, ?)",
+                    params![id.clone(), lat, lon, serde_json::to_string(tags)?],
+                )?;
+            }
         }
     }
 
