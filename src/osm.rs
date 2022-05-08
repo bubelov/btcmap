@@ -1,10 +1,12 @@
-use std::fs::File;
+use std::fs::{File, Metadata};
 use std::io::Write;
 use std::path::Path;
 use anyhow::{Context, Result};
 use reqwest::Response;
 use rusqlite::{Connection, params};
 use serde_json::{Map, Value};
+use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 pub async fn cli_main(args: &[String]) -> Result<()> {
     match args.first() {
@@ -26,7 +28,10 @@ async fn sync() -> Result<()> {
     let cached_response = Path::new("/tmp/cached-osm-response.json");
 
     if cached_response.exists() {
-        println!("Cached response exists")
+        println!("Cached response exists");
+        let metadata: Metadata = cached_response.metadata()?;
+        let created: OffsetDateTime = metadata.modified()?.into();
+        println!("Cached response was last modified at {}", created.format(&Rfc3339)?);
     } else {
         println!("Response cache is empty");
         println!("Querying OSM API, it could take a while...");
@@ -68,7 +73,7 @@ async fn sync() -> Result<()> {
         })?;
 
         if exists {
-            println!("Place exists");
+            //println!("Place exists");
         } else {
             println!("Place does not exist, inserting");
 
