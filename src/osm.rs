@@ -7,8 +7,8 @@ use rusqlite::{Connection, params, Transaction};
 use serde_json::{Map, Value};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
-use crate::model::Place;
-use crate::repository::PlaceRepository;
+use crate::Place;
+use crate::PlaceRepository;
 
 pub async fn cli_main(args: &[String]) -> Result<()> {
     match args.first() {

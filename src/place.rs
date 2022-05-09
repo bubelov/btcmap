@@ -1,7 +1,7 @@
 use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Place {
     pub id: i64,
     pub lat: f64,

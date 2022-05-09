@@ -1,7 +1,7 @@
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::Value;
 use anyhow::{Error, Result};
-use crate::model::Place;
+use crate::Place;
 
 pub struct PlaceRepository {
     conn: Connection,
@@ -13,7 +13,7 @@ impl PlaceRepository {
     }
 
     pub fn select_all(&self) -> Result<Vec<Place>> {
-        let mut stmt = self.conn.prepare("SELECT id, lat, lon, tags, created_at, updated_at, deleted_at FROM places ORDER BY id DESC")?;
+        let mut stmt = self.conn.prepare("SELECT id, lat, lon, tags, created_at, updated_at, deleted_at FROM places ORDER BY updated_at DESC")?;
 
         let rows = stmt.query_map(
             [],
