@@ -19,7 +19,7 @@ async fn cli_main(args: &[String]) {
     match args.len() {
         0 => {
             let server: Result<(), rocket::Error> = rocket::build()
-                .mount("/", routes![controller::place::index])
+                .mount("/", routes![controller::place::get_places, controller::place::get_place])
                 .launch()
                 .await;
 

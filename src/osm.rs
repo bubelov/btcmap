@@ -101,6 +101,7 @@ async fn sync() -> Result<()> {
             None => {
                 println!("Place does not exist, inserting");
                 println!("id: {}, lat: {}, lon {}", id, lat, lon);
+                println!("Tags:\n{}", serde_json::to_string(tags)?);
 
                 tx.execute(
                     "INSERT INTO places (id, lat, lon, tags) VALUES (?, ?, ?, ?)",

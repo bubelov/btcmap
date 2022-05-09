@@ -44,7 +44,7 @@ impl PlaceRepository {
 
     pub fn select_by_id(&self, id: i64) -> Result<Option<Place>> {
         self.conn.query_row(
-            "SELECT id, lat, lon, tags, created_at, updated_at FROM places WHERE id = ?",
+            "SELECT id, lat, lon, tags, created_at, updated_at, deleted_at FROM places WHERE id = ?",
             params![id],
             |row| {
                 let tags: String = row.get(3)?;
