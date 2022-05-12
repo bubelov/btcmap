@@ -55,7 +55,7 @@ async fn get_places(args: actix_web::web::Query<GetPlacesArgs>) -> Json<Vec<Plac
 
     let places: Vec<Place> = match &args.created_or_updated_since {
         Some(created_or_updated_since) => {
-            repo.select_all().unwrap().iter().filter(|it| &it.updated_at >= created_or_updated_since).cloned().collect()
+            repo.select_all().unwrap().into_iter().filter(|it| &it.updated_at >= created_or_updated_since).collect()
         }
         None => {
             repo.select_all().unwrap()
