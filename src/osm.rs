@@ -71,6 +71,7 @@ async fn sync(mut db_conn: Connection) {
         if !fresh_places_ids.contains(&cached_place.id) {
             println!("Place with id {} was deleted from OSM", cached_place.id);
             let query = "UPDATE places SET deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ') WHERE id = ?";
+            println!("Executing query:{}", query);
             tx.execute(query, params![cached_place.id]).unwrap();
         }
     }
