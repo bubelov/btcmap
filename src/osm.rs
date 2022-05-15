@@ -43,6 +43,8 @@ async fn sync(mut db_conn: Connection) {
                 [out:json][timeout:300];
                 (
                   node["payment:bitcoin"="yes"];
+                  way["payment:bitcoin"="yes"];
+                  relation["payment:bitcoin"="yes"];
                 );
                 out center;
             "#)
@@ -56,11 +58,34 @@ async fn sync(mut db_conn: Connection) {
     }
 
     let cached_response: File = File::open("/tmp/cached-osm-response.json").unwrap();
-    let json: Value = serde_json::from_reader(cached_response).unwrap();
 
-    let fresh_places: &Vec<Value> = json["elements"].as_array().unwrap();
-    println!("Got {} places", fresh_places.len());
-    let fresh_places_ids: HashSet<i64> = fresh_places.iter().map(|it| it["id"].as_i64().unwrap()).collect();
+    let elements: Value = serde_json::from_reader(cached_response).unwrap();
+    let elements: &Vec<Value> = elements["elements"].as_array().unwrap();
+    println!("Got {} elements", elements.len());
+
+    let nodes: Vec<&Value> = elements
+        .iter()
+        .filter(|it| it["type"].as_str().unwrap() == "node")
+        .collect();
+
+    let ways: Vec<&Value> = elements
+        .iter()
+        .filter(|it| it["type"].as_str().unwrap() == "way")
+        .collect();
+
+    let relations: Vec<&Value> = elements
+        .iter()
+        .filter(|it| it["type"].as_str().unwrap() == "relation")
+        .collect();
+
+    println!(
+        "Of them:\nNodes {}\nWays {}\nRelations {}",
+        nodes.len(),
+        ways.len(),
+        relations.len(),
+    );
+
+    let element_ids: HashSet<i64> = elements.iter().map(|it| it["id"].as_i64().unwrap()).collect();
 
     let tx: Transaction = db_conn.transaction().unwrap();
     let mut cached_places_stmt: Statement = tx.prepare("SELECT id, lat, lon, tags, created_at, updated_at, deleted_at FROM places").unwrap();
@@ -68,7 +93,7 @@ async fn sync(mut db_conn: Connection) {
     drop(cached_places_stmt);
 
     for cached_place in &cached_places {
-        if !fresh_places_ids.contains(&cached_place.id) && cached_place.deleted_at.is_empty() {
+        if !element_ids.contains(&cached_place.id) && cached_place.deleted_at.is_empty() {
             println!("Place with id {} was deleted from OSM", cached_place.id);
             let query = "UPDATE places SET deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ') WHERE id = ?";
             println!("Executing query:{}", query);
@@ -76,12 +101,20 @@ async fn sync(mut db_conn: Connection) {
         }
     }
 
-    for place in fresh_places {
-        let id = place["id"].as_i64().unwrap();
-        let lat: f64 = place["lat"].as_f64().unwrap();
-        let lon: f64 = place["lon"].as_f64().unwrap();
+    for element in elements {
+        let id = element["id"].as_i64().unwrap();
+
+        let (lat, lon) = match element["type"].as_str().unwrap() {
+            "node" => (element["lat"].as_f64().unwrap(), element["lon"].as_f64().unwrap()),
+            "way" | "relation" => (
+                element["center"].as_object().unwrap()["lat"].as_f64().unwrap(),
+                element["center"].as_object().unwrap()["lon"].as_f64().unwrap(),
+            ),
+            _ => panic!("Unknown element type"),
+        };
+
         let empty_map: Map<String, Value> = Map::new();
-        let tags: &Map<String, Value> = place["tags"].as_object().unwrap_or(&empty_map);
+        let tags: &Map<String, Value> = element["tags"].as_object().unwrap_or(&empty_map);
 
         let cached_place = cached_places.iter().find(|it| it.id == id);
 
