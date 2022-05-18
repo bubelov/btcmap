@@ -1,13 +1,14 @@
 use std::collections::HashSet;
 use std::fs::{File, Metadata};
 use std::io::Write;
-use std::path::Path;
+use std::path::PathBuf;
+use directories::ProjectDirs;
 use reqwest::Response;
 use rusqlite::{Connection, params, Statement, Transaction};
 use serde_json::{Map, Value};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
-use crate::{db::place_mapper, Place};
+use crate::{db::place_mapper, get_project_dirs, Place};
 
 pub async fn cli_main(
     args: &[String],
@@ -25,19 +26,21 @@ pub async fn cli_main(
 }
 
 async fn sync(mut db_conn: Connection) {
-    let client = reqwest::Client::new();
+    let client: reqwest::Client = reqwest::Client::new();
+    let project_dirs: ProjectDirs = get_project_dirs();
+    let last_response_path: PathBuf = project_dirs.cache_dir().join("last-osm-response.json");
 
-    let cached_response = Path::new("/tmp/cached-osm-response.json");
-
-    if cached_response.exists() {
-        println!("Cached response exists");
-        let metadata: Metadata = cached_response.metadata().unwrap();
-        let created: OffsetDateTime = metadata.modified().unwrap().into();
-        println!("Cached response was last modified at {}", created.format(&Rfc3339).unwrap());
+    if last_response_path.exists() {
+        println!("Found last OSM response at {}", last_response_path.to_str().unwrap());
+        let metadata: Metadata = last_response_path.metadata().unwrap();
+        let modified: OffsetDateTime = metadata.modified().unwrap().into();
+        println!(
+            "Last OSM response file was last modified at {}",
+            modified.format(&Rfc3339).unwrap(),
+        );
     } else {
-        println!("Response cache is empty");
+        println!("There are no previously cached responses");
         println!("Querying OSM API, it could take a while...");
-
         let response: Response = client.post("https://overpass-api.de/api/interpreter")
             .body(r#"
                 [out:json][timeout:300];
@@ -52,14 +55,13 @@ async fn sync(mut db_conn: Connection) {
             .await
             .unwrap();
 
-        let mut file = File::create("/tmp/cached-osm-response.json").unwrap();
+        let mut file: File = File::create(&last_response_path).unwrap();
         let response_body = response.bytes().await.unwrap();
         file.write_all(&response_body).unwrap();
     }
 
-    let cached_response: File = File::open("/tmp/cached-osm-response.json").unwrap();
-
-    let elements: Value = serde_json::from_reader(cached_response).unwrap();
+    let response: File = File::open(last_response_path).unwrap();
+    let elements: Value = serde_json::from_reader(response).unwrap();
     let elements: &Vec<Value> = elements["elements"].as_array().unwrap();
     println!("Got {} elements", elements.len());
 

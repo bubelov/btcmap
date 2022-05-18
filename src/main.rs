@@ -101,11 +101,15 @@ async fn get_place(
 }
 
 fn get_db_file_path() -> PathBuf {
-    let project_dirs = ProjectDirs::from("org", "BTC Map", "BTC Map").unwrap();
+    let project_dirs = get_project_dirs();
 
     if !project_dirs.data_dir().exists() {
         create_dir_all(project_dirs.data_dir()).unwrap()
     }
 
     project_dirs.data_dir().join("btcmap.db")
+}
+
+fn get_project_dirs() -> ProjectDirs {
+    return ProjectDirs::from("org", "BTC Map", "BTC Map").unwrap()
 }
