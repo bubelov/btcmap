@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::fs::{File, Metadata};
+use std::fs::{create_dir_all, File, Metadata};
 use std::io::Write;
 use std::path::PathBuf;
 use directories::ProjectDirs;
@@ -26,8 +26,12 @@ pub async fn cli_main(
 }
 
 async fn sync(mut db_conn: Connection) {
-    let client: reqwest::Client = reqwest::Client::new();
     let project_dirs: ProjectDirs = get_project_dirs();
+
+    if !project_dirs.cache_dir().exists() {
+        create_dir_all(project_dirs.cache_dir()).unwrap()
+    }
+
     let last_response_path: PathBuf = project_dirs.cache_dir().join("last-osm-response.json");
 
     if last_response_path.exists() {
@@ -41,7 +45,7 @@ async fn sync(mut db_conn: Connection) {
     } else {
         println!("There are no previously cached responses");
         println!("Querying OSM API, it could take a while...");
-        let response: Response = client.post("https://overpass-api.de/api/interpreter")
+        let response: Response = reqwest::Client::new().post("https://overpass-api.de/api/interpreter")
             .body(r#"
                 [out:json][timeout:300];
                 (
