@@ -3,9 +3,10 @@ extern crate core;
 mod db;
 mod osm;
 mod place;
+mod sync;
 
 use std::env;
-use std::fs::create_dir_all;
+use std::fs::{create_dir_all, File};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -15,12 +16,13 @@ use actix_web::web;
 use actix_web::web::Json;
 use directories::ProjectDirs;
 use rusqlite::{Connection, OptionalExtension, Statement};
+use serde_json::Value;
 use crate::{place::Place, db::place_mapper};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     if env::var("RUST_BACKTRACE").is_err() {
-       env::set_var("RUST_BACKTRACE", "1");
+        env::set_var("RUST_BACKTRACE", "1");
     }
 
     if env::var("RUST_LOG").is_err() {
@@ -43,6 +45,7 @@ async fn main() -> std::io::Result<()> {
                     .app_data(db_conn.clone())
                     .service(get_places)
                     .service(get_place)
+                    .service(get_data)
             }).bind(("127.0.0.1", 8000))?.run().await
         }
         _ => {
@@ -51,6 +54,7 @@ async fn main() -> std::io::Result<()> {
             match args.get(1).unwrap().as_str() {
                 "db" => { db::cli_main(&args[2..], db_conn); }
                 "osm" => { osm::cli_main(&args[2..], db_conn).await; }
+                "sync" => { sync::sync().await; }
                 _ => { panic!("Unknown action"); }
             }
 
@@ -87,6 +91,20 @@ async fn get_places(
     Json(places)
 }
 
+#[actix_web::get("/data")]
+async fn get_data() -> Json<Value> {
+    let project_dirs: ProjectDirs = get_project_dirs();
+
+    if !project_dirs.cache_dir().exists() {
+        create_dir_all(project_dirs.cache_dir()).unwrap()
+    }
+
+    let last_response_path: PathBuf = project_dirs.cache_dir().join("last-osm-response-v2.json");
+    let response: File = File::open(last_response_path).unwrap();
+    let response: Value = serde_json::from_reader(response).unwrap();
+    Json(response)
+}
+
 #[actix_web::get("/places/{id}")]
 async fn get_place(
     path: web::Path<i64>,
@@ -111,5 +129,5 @@ fn get_db_file_path() -> PathBuf {
 }
 
 fn get_project_dirs() -> ProjectDirs {
-    return ProjectDirs::from("org", "BTC Map", "BTC Map").unwrap()
+    return ProjectDirs::from("org", "BTC Map", "BTC Map").unwrap();
 }
