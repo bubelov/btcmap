@@ -99,7 +99,7 @@ async fn get_data() -> Json<Value> {
         create_dir_all(project_dirs.cache_dir()).unwrap()
     }
 
-    let last_response_path: PathBuf = project_dirs.cache_dir().join("last-osm-response-v2.json");
+    let last_response_path: PathBuf = project_dirs.cache_dir().join("data.json");
     let response: File = File::open(last_response_path).unwrap();
     let response: Value = serde_json::from_reader(response).unwrap();
     Json(response)
